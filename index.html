@@ -58,6 +58,53 @@ header {
   height: 60px;
 }
 .logo-img { height: 40px; width: auto; object-fit: contain; flex-shrink: 0; cursor: pointer; }
+
+/* ── HAMBURGER (mobile category menu trigger) ── */
+.hamburger-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  margin-right: 10px;
+  align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  padding: 0;
+}
+.hamburger-btn svg { width: 22px; height: 22px; color: var(--brown); }
+
+/* ── MOBILE CATEGORY MENU (slide-down panel) ── */
+.mobile-cat-menu {
+  display: none;
+  position: fixed;
+  top: 60px; left: 0; right: 0;
+  background: var(--white);
+  border-bottom: 1px solid var(--sand);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+  z-index: 199;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .25s ease;
+}
+.mobile-cat-menu.open { max-height: 70vh; overflow-y: auto; }
+.mobile-cat-menu .cat-pill-mobile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 20px;
+  font-family: var(--font-b); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  background: none; border: none; border-bottom: 1px solid var(--sand);
+  color: var(--stone); cursor: pointer;
+}
+.mobile-cat-menu .cat-pill-mobile.active { color: var(--brown); }
+.mobile-cat-menu .cat-pill-mobile:last-child { border-bottom: none; }
+.menu-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.25);
+  z-index: 198;
+}
+.menu-backdrop.open { display: block; }
+
 /* ── CATEGORY NAV (inline in header) ── */
 .cat-nav-outer {
   position: relative;
@@ -119,9 +166,10 @@ header {
 }
 .header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 @media (max-width: 600px) {
-  .cat-nav-outer { margin: 0 10px; }
-  .cat-pill { padding: 2px 10px 4px; font-size: 10.5px; }
   .header-top { padding: 0 12px; }
+  .logo-img { height: 30px; }
+  .hamburger-btn { display: flex; }
+  .cat-nav-outer { display: none; }
 }
 .wsp-btn {
   display: flex; align-items: center; gap: 7px;
@@ -854,6 +902,9 @@ footer {
 <!-- HEADER -->
 <header>
   <div class="header-top">
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Abrir menú de categorías">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <img class="logo-img" id="logo-home-btn" src="logo.jpeg" alt="Barda Home">
     <div class="cat-nav-outer">
       <nav class="cat-nav" id="cat-nav">
@@ -867,6 +918,10 @@ footer {
       </a>
     </div>
   </div>
+  <div class="menu-backdrop" id="menu-backdrop"></div>
+  <nav class="mobile-cat-menu" id="mobile-cat-menu">
+    <!-- filled by JS, mirrors #cat-nav -->
+  </nav>
 </header>
 
 <div id="home-view">
@@ -1300,37 +1355,61 @@ function showCatalogView() {
 
 function buildNav(cats) {
   const nav = document.getElementById('cat-nav');
+  const mobileMenu = document.getElementById('mobile-cat-menu');
   nav.innerHTML = '';
+  if (mobileMenu) mobileMenu.innerHTML = '';
 
-  // Inicio — always first
-  const homeBtn = document.createElement('button');
-  homeBtn.className = 'cat-pill active';
-  homeBtn.dataset.filter = '__home';
-  homeBtn.textContent = 'Inicio';
-  nav.appendChild(homeBtn);
+  function goTo(filter) {
+    // sync active state on both the desktop pills and the mobile menu
+    nav.querySelectorAll('.cat-pill').forEach(x => x.classList.toggle('active', x.dataset.filter === filter));
+    if (mobileMenu) {
+      mobileMenu.querySelectorAll('.cat-pill-mobile').forEach(x => x.classList.toggle('active', x.dataset.filter === filter));
+    }
+    showCatalogView();
+    renderCatalog(filter);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollActivePillIntoView();
+    closeMobileCatMenu();
+  }
 
   cats.forEach(c => {
     const b = document.createElement('button');
-    b.className = 'cat-pill'; b.dataset.filter = c; b.textContent = c;
+    b.className = 'cat-pill';
+    b.dataset.filter = c; b.textContent = c;
+    b.addEventListener('click', () => goTo(c));
     nav.appendChild(b);
-  });
 
-  nav.querySelectorAll('.cat-pill').forEach(b => b.addEventListener('click', () => {
-    nav.querySelectorAll('.cat-pill').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    if (b.dataset.filter === '__home') {
-      showHomeView();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      showCatalogView();
-      renderCatalog(b.dataset.filter);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (mobileMenu) {
+      const m = document.createElement('button');
+      m.className = 'cat-pill-mobile';
+      m.dataset.filter = c; m.textContent = c;
+      m.addEventListener('click', () => goTo(c));
+      mobileMenu.appendChild(m);
     }
-    scrollActivePillIntoView();
-  }));
+  });
 
   setupCatNavScrollHints();
 }
+
+function openMobileCatMenu() {
+  document.getElementById('mobile-cat-menu').classList.add('open');
+  document.getElementById('menu-backdrop').classList.add('open');
+}
+function closeMobileCatMenu() {
+  document.getElementById('mobile-cat-menu').classList.remove('open');
+  document.getElementById('menu-backdrop').classList.remove('open');
+}
+function setupMobileCatMenuToggle() {
+  const btn = document.getElementById('hamburger-btn');
+  const backdrop = document.getElementById('menu-backdrop');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const menu = document.getElementById('mobile-cat-menu');
+    menu.classList.contains('open') ? closeMobileCatMenu() : openMobileCatMenu();
+  });
+  backdrop.addEventListener('click', closeMobileCatMenu);
+}
+document.addEventListener('DOMContentLoaded', setupMobileCatMenuToggle);
 
 // Keeps the active pill scrolled into view (helps on mobile where
 // the category nav has no visible scrollbar to hint at overflow).
@@ -1367,12 +1446,10 @@ function setupLogoHomeLink() {
   if (!logo) return;
   logo.addEventListener('click', () => {
     const nav = document.getElementById('cat-nav');
-    if (nav) {
-      nav.querySelectorAll('.cat-pill').forEach(x => x.classList.remove('active'));
-      const homeBtn = nav.querySelector('.cat-pill[data-filter="__home"]');
-      if (homeBtn) homeBtn.classList.add('active');
-      scrollActivePillIntoView();
-    }
+    const mobileMenu = document.getElementById('mobile-cat-menu');
+    if (nav) nav.querySelectorAll('.cat-pill').forEach(x => x.classList.remove('active'));
+    if (mobileMenu) mobileMenu.querySelectorAll('.cat-pill-mobile').forEach(x => x.classList.remove('active'));
+    closeMobileCatMenu();
     showHomeView();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
