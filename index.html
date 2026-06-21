@@ -57,9 +57,10 @@ header {
   max-width: 1200px; margin: 0 auto;
   height: 60px;
 }
-.logo-img { height: 40px; width: auto; object-fit: contain; flex-shrink: 0; }
+.logo-img { height: 40px; width: auto; object-fit: contain; flex-shrink: 0; cursor: pointer; }
 /* ── CATEGORY NAV (inline in header) ── */
 .cat-nav-outer {
+  position: relative;
   flex: 1;
   align-self: stretch;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -67,6 +68,29 @@ header {
   margin: 0 28px;
 }
 .cat-nav-outer::-webkit-scrollbar { display: none; }
+/* Fade indicators that hint there's more to scroll horizontally.
+   Toggled via the .show-left / .show-right classes set in JS. */
+.cat-nav-outer::before,
+.cat-nav-outer::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+  z-index: 1;
+}
+.cat-nav-outer::before {
+  left: 0;
+  background: linear-gradient(to right, var(--cream, #faf6ef) 0%, transparent 100%);
+}
+.cat-nav-outer::after {
+  right: 0;
+  background: linear-gradient(to left, var(--cream, #faf6ef) 0%, transparent 100%);
+}
+.cat-nav-outer.show-left::before { opacity: 1; }
+.cat-nav-outer.show-right::after { opacity: 1; }
 .cat-nav {
   display: flex; gap: 0;
   height: 100%;
@@ -94,6 +118,11 @@ header {
   text-underline-offset: 5px;
 }
 .header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+@media (max-width: 600px) {
+  .cat-nav-outer { margin: 0 10px; }
+  .cat-pill { padding: 2px 10px 4px; font-size: 10.5px; }
+  .header-top { padding: 0 12px; }
+}
 .wsp-btn {
   display: flex; align-items: center; gap: 7px;
   padding: 10px 18px;
@@ -825,7 +854,7 @@ footer {
 <!-- HEADER -->
 <header>
   <div class="header-top">
-    <img class="logo-img" src="logo.jpeg" alt="Barda Home">
+    <img class="logo-img" id="logo-home-btn" src="logo.jpeg" alt="Barda Home">
     <div class="cat-nav-outer">
       <nav class="cat-nav" id="cat-nav">
         <!-- filled by JS -->
@@ -1045,7 +1074,7 @@ footer {
       <div class="ft-col-title">Contacto</div>
       <div class="ft-col-item">
         <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-        (299) 527-6370
+        (299) 000-0000
       </div>
       <div class="ft-col-item">
         <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -1297,8 +1326,58 @@ function buildNav(cats) {
       renderCatalog(b.dataset.filter);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    scrollActivePillIntoView();
   }));
+
+  setupCatNavScrollHints();
 }
+
+// Keeps the active pill scrolled into view (helps on mobile where
+// the category nav has no visible scrollbar to hint at overflow).
+function scrollActivePillIntoView() {
+  const nav = document.getElementById('cat-nav');
+  const active = nav && nav.querySelector('.cat-pill.active');
+  if (active) active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+// Shows fade hints on .cat-nav-outer when the pill list overflows
+// the visible width, so it's clear there's more to scroll to.
+let _catNavHintsBound = false;
+function setupCatNavScrollHints() {
+  const outer = document.querySelector('.cat-nav-outer');
+  if (!outer) return;
+
+  function update() {
+    const maxScroll = outer.scrollWidth - outer.clientWidth;
+    outer.classList.toggle('show-left', outer.scrollLeft > 4);
+    outer.classList.toggle('show-right', outer.scrollLeft < maxScroll - 4);
+  }
+
+  update();
+  if (!_catNavHintsBound) {
+    outer.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    _catNavHintsBound = true;
+  }
+}
+
+// Clicking the logo always takes you back to the home view.
+function setupLogoHomeLink() {
+  const logo = document.getElementById('logo-home-btn');
+  if (!logo) return;
+  logo.addEventListener('click', () => {
+    const nav = document.getElementById('cat-nav');
+    if (nav) {
+      nav.querySelectorAll('.cat-pill').forEach(x => x.classList.remove('active'));
+      const homeBtn = nav.querySelector('.cat-pill[data-filter="__home"]');
+      if (homeBtn) homeBtn.classList.add('active');
+      scrollActivePillIntoView();
+    }
+    showHomeView();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+document.addEventListener('DOMContentLoaded', setupLogoHomeLink);
 
 // ═══════════════════════════════════════
 //  FILTERS
